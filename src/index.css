@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1c1917;
+  --color-primary-light: #292524;
+  --color-accent: #dc2626;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-warning: #f59e0b;
+  --color-success: #15803d;
+  --font-sans: 'Outfit', 'Inter', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+@layer base {
+  :root {
+    --background: #f8f7f4;
+    --foreground: #1c1917;
+    --riso-cream: #fbf9f5;
+    --riso-red: #dc2626;
+    --riso-shadow: rgba(28, 25, 23, 0.08);
+  }
+  
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  .glass {
+    background-color: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(231, 229, 228, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(28, 25, 23, 0.05);
+  }
+
+  .riso-card {
+    background-color: #ffffff;
+    border: 1px solid rgba(231, 229, 228, 0.9);
+    box-shadow: 4px 4px 0px 0px rgba(28, 25, 23, 0.07);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .riso-card:hover {
+    box-shadow: 6px 6px 0px 0px rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .leaflet-container {
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+  }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.animate-pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+
+@keyframes progress-ring {
+  0% { stroke-dashoffset: 283; }
+  100% { stroke-dashoffset: 0; }
+}
+.animate-progress-ring { animation: progress-ring var(--duration, 5s) linear forwards; }
