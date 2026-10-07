@@ -1,12 +1,24 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Phone, MapPin, History, Settings, ShieldAlert, User } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { highContrast } = useAccessibility();
   const { user } = useAuth();
+
+  // Enforce profile setup for first-time users
+  useEffect(() => {
+    const isSetupComplete = localStorage.getItem('aea_profile_setup_complete') === 'true';
+    const allowedPaths = ['/profile', '/settings', '/accessibility'];
+    
+    if (!isSetupComplete && !allowedPaths.includes(location.pathname)) {
+      navigate('/profile', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   // Derive display name: prefer full_name metadata, else email prefix, else 'User'
   const fullName: string =

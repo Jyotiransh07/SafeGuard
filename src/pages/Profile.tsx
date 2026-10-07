@@ -25,15 +25,29 @@ export default function Profile() {
   const { user } = useAuth();
   const isConfigured = isSupabaseConfigured();
 
-  const [medical, setMedical] = useState<MedicalData>(DEFAULT_MEDICAL);
-  const [fullName, setFullName] = useState('Alex Morgan');
-  const [phone, setPhone] = useState('+1 (555) 234-5678');
+  // Try to load from localStorage first for prototype mode persistence
+  const getInitialMedical = () => {
+    try {
+      const saved = localStorage.getItem('aea_medical_profile');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return DEFAULT_MEDICAL;
+  };
+
+  const getInitialName = () => localStorage.getItem('aea_full_name') || 'Alex Morgan';
+  const getInitialPhone = () => localStorage.getItem('aea_phone') || '+1 (555) 234-5678';
+
+  const [medical, setMedical] = useState<MedicalData>(getInitialMedical);
+  const [fullName, setFullName] = useState(getInitialName);
+  const [phone, setPhone] = useState(getInitialPhone);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<MedicalData>(DEFAULT_MEDICAL);
-  const [editName, setEditName] = useState('Alex Morgan');
-  const [editPhone, setEditPhone] = useState('+1 (555) 234-5678');
+  const [editForm, setEditForm] = useState<MedicalData>(medical);
+  const [editName, setEditName] = useState(fullName);
+  const [editPhone, setEditPhone] = useState(phone);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Fetch Supabase Profile and Medical Card
@@ -127,13 +141,20 @@ export default function Profile() {
         console.error('Error updating medical profile:', err);
       }
     } else {
-      // Local fallback
+      // Local fallback with localStorage persistence
       setFullName(editName);
       setPhone(editPhone);
       setMedical(editForm);
+      localStorage.setItem('aea_medical_profile', JSON.stringify(editForm));
+      localStorage.setItem('aea_full_name', editName);
+      localStorage.setItem('aea_phone', editPhone);
+      
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     }
+
+    // Mark profile as setup so we don't prompt them again
+    localStorage.setItem('aea_profile_setup_complete', 'true');
 
     setSaving(false);
     setIsEditing(false);
