@@ -70,10 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isConfigured) {
       return { error: null };
     }
+    // Use explicit site URL from env (set in Vercel dashboard) or fall back to current origin.
+    // The redirect URL MUST be whitelisted in:
+    //   1. Supabase Dashboard → Auth → URL Configuration → Redirect URLs
+    //   2. Google Cloud Console → OAuth 2.0 → Authorized redirect URIs
+    const siteUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim()?.replace(/\/$/, '') || window.location.origin;
+    const redirectTo = `${siteUrl}/dashboard`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/dashboard'
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       }
     });
     return { error: error as Error | null };

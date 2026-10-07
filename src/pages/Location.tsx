@@ -1,7 +1,56 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Share2, Radio, Navigation, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Share2, Radio, Navigation, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useEmergency } from '../context/EmergencyContext';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix default Leaflet marker icons broken by Vite bundling
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
+// Custom red SOS marker
+const sosIcon = new L.DivIcon({
+  className: '',
+  html: `<div style="
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #DC2626; border: 3px solid white;
+    box-shadow: 0 0 0 3px #DC2626, 0 4px 12px rgba(220,38,38,0.5);
+    display: flex; align-items: center; justify-content: center;
+    animation: sosPulse 1.5s ease-in-out infinite;
+  ">
+    <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
+      <path d="M12 2L2 20h20L12 2zm0 3.5L19.5 19h-15L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+    </svg>
+  </div>
+  <style>
+    @keyframes sosPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+  </style>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -22],
+});
+
+// Helper: smoothly re-center map when position changes
+function MapRecenter({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng], 16, { animate: true });
+  }, [lat, lng, map]);
+  return null;
+}
 
 export default function LocationPage() {
   const { recordLocation, incidentId } = useEmergency();
@@ -9,55 +58,63 @@ export default function LocationPage() {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSharing, setIsSharing] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const isConfigured = isSupabaseConfigured();
 
   const fetchLocation = () => {
     setLoading(true);
-    
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const acc = pos.coords.accuracy;
-          setPosition([lat, lng]);
-          setAccuracy(acc);
-          setLoading(false);
+    setGeoError(null);
 
-          // If incident is active, record location to Supabase
-          if (incidentId && isConfigured) {
-            await recordLocation(lat, lng, acc);
-          }
-        },
-        () => {
-          // If denied, fallback to a sensible default (e.g. standard demo coordinates)
-          setPosition([37.7749, -122.4194]);
-          setAccuracy(4.5);
-          setLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    } else {
-      setPosition([37.7749, -122.4194]);
-      setAccuracy(5);
+    if (!('geolocation' in navigator)) {
+      setGeoError('Geolocation is not supported by this browser.');
       setLoading(false);
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = pos.coords.accuracy;
+        setPosition([lat, lng]);
+        setAccuracy(acc);
+        setLoading(false);
+        setGeoError(null);
+
+        // If incident is active, record location to Supabase
+        if (incidentId && isConfigured) {
+          await recordLocation(lat, lng, acc);
+        }
+      },
+      (err) => {
+        setLoading(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          setGeoError('Location permission denied. Please allow location access in your browser settings and try again.');
+        } else if (err.code === err.TIMEOUT) {
+          setGeoError('GPS lock timed out. Please try again or move to an open area.');
+        } else {
+          setGeoError('Unable to acquire location. Please try again.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
   };
 
   useEffect(() => {
     fetchLocation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleShare = async () => {
     if (!position) return;
-    
+
     const url = `https://maps.google.com/?q=${position[0]},${position[1]}`;
     const text = `Emergency SOS live location pin (${position[0].toFixed(5)}, ${position[1].toFixed(5)}):`;
 
     if (incidentId && isConfigured) {
       await recordLocation(position[0], position[1], accuracy || 4.0);
     }
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -70,9 +127,13 @@ export default function LocationPage() {
         // user cancelled share
       }
     } else {
-      navigator.clipboard.writeText(`${text} ${url}`);
-      setIsSharing(true);
-      alert("Emergency location link copied to clipboard!");
+      try {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        setIsSharing(true);
+        alert('Emergency location link copied to clipboard!');
+      } catch {
+        alert(`Copy this link: ${url}`);
+      }
     }
   };
 
@@ -97,35 +158,73 @@ export default function LocationPage() {
       </div>
 
       {/* Map Viewport Card */}
-      <div className="flex-1 min-h-[340px] bg-white rounded-3xl overflow-hidden relative border border-stone-200/90 shadow-[4px_4px_0px_0px_rgba(28,25,23,0.06)]">
+      <div className="flex-1 min-h-[380px] bg-white rounded-3xl overflow-hidden relative border border-stone-200/90 shadow-[4px_4px_0px_0px_rgba(28,25,23,0.06)]">
+        {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/70 backdrop-blur-xs gap-3">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm gap-3">
             <RefreshCw className="w-8 h-8 text-red-600 animate-spin" />
             <span className="text-xs font-mono font-bold text-stone-600">Locking satellite GPS...</span>
           </div>
         )}
 
-        {position && (
-          <iframe 
-            className="absolute inset-0 w-full h-full"
-            style={{ border: 0, filter: 'contrast(1.05) saturate(1.1)' }}
-            src={`https://maps.google.com/maps?q=${position[0]},${position[1]}&z=15&output=embed`}
-            allowFullScreen
-            title="Emergency Current Location"
-          ></iframe>
+        {/* Geolocation error state */}
+        {!loading && geoError && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#f8f7f4] gap-4 p-8 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <div>
+              <p className="font-bold text-stone-900 text-sm mb-1">Location Access Required</p>
+              <p className="text-xs text-stone-500 leading-relaxed max-w-xs">{geoError}</p>
+            </div>
+            <button
+              onClick={fetchLocation}
+              className="px-5 py-2.5 bg-red-600 text-white rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-red-700 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" /> Try Again
+            </button>
+          </div>
+        )}
+
+        {/* OpenStreetMap via react-leaflet — works on all domains, no API key */}
+        {!loading && !geoError && position && (
+          <MapContainer
+            center={position}
+            zoom={16}
+            style={{ height: '100%', width: '100%' }}
+            zoomControl={true}
+            attributionControl={false}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            />
+            <MapRecenter lat={position[0]} lng={position[1]} />
+            <Marker position={position} icon={sosIcon}>
+              <Popup>
+                <div className="text-xs font-mono font-bold text-red-700">
+                  📍 Your Location<br />
+                  {position[0].toFixed(5)}°, {position[1].toFixed(5)}°<br />
+                  Accuracy: ±{accuracy ? Math.round(accuracy) : '?'}m
+                </div>
+              </Popup>
+            </Marker>
+          </MapContainer>
         )}
 
         {/* Floating Telemetry Stamp */}
-        <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-stone-200/80 shadow-sm flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-[11px] font-mono font-bold text-stone-700">
-            {position ? `${position[0].toFixed(4)}°, ${position[1].toFixed(4)}°` : 'Acquiring lock...'}
-          </span>
-        </div>
+        {position && !loading && !geoError && (
+          <div className="absolute top-4 left-4 z-[500] bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-stone-200/80 shadow-sm flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-[11px] font-mono font-bold text-stone-700">
+              {position[0].toFixed(4)}°, {position[1].toFixed(4)}°
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Details & Controls Card */}
-      {position && (
+      {position && !geoError && (
         <div className="bg-white rounded-3xl p-6 border border-stone-200/90 shadow-[4px_4px_0px_0px_rgba(28,25,23,0.06)] space-y-4">
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-[#f8f7f4] p-3.5 rounded-2xl border border-stone-200/80">
@@ -149,17 +248,17 @@ export default function LocationPage() {
           </div>
 
           <div className="flex gap-3">
-            <button 
+            <button
               onClick={fetchLocation}
               className="flex-1 py-3.5 bg-[#f8f7f4] hover:bg-stone-100 text-stone-800 border border-stone-200 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <RefreshCw className="w-4 h-4 text-stone-500" /> Refresh GPS
             </button>
-            <button 
+            <button
               onClick={isSharing ? () => setIsSharing(false) : handleShare}
               className={`flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md
-                ${isSharing 
-                  ? 'bg-stone-900 text-white hover:bg-stone-800 shadow-stone-900/20' 
+                ${isSharing
+                  ? 'bg-stone-900 text-white hover:bg-stone-800 shadow-stone-900/20'
                   : 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/30'
                 }
               `}
@@ -168,7 +267,7 @@ export default function LocationPage() {
               {isSharing ? 'Stop Broadcast' : 'Broadcast Location'}
             </button>
           </div>
-          
+
           {isSharing && (
             <div className="flex gap-2.5 items-center text-xs font-mono font-bold text-red-800 bg-red-50 p-3 rounded-2xl border border-red-200">
               <Radio className="w-4 h-4 text-red-600 shrink-0 animate-pulse" />

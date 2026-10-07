@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEmergency } from '../context/EmergencyContext';
-import { ShieldAlert, X, AlertTriangle, Send, MapPin, CheckCircle2, MessageSquare, Activity, Radio } from 'lucide-react';
+import { ShieldAlert, X, AlertTriangle, Send, MapPin, CheckCircle2, MessageSquare, Activity, Radio, MessageCircle, Phone } from 'lucide-react';
 
 export default function Emergency() {
   const navigate = useNavigate();
-  const { status, setStatus, countdown, setCountdown, cancelSOS, resolveSOS, sendIncidentMessage } = useEmergency();
+  const { status, setStatus, countdown, setCountdown, cancelSOS, resolveSOS, sendIncidentMessage, dispatchedContacts } = useEmergency();
   const [timelineStep, setTimelineStep] = useState(0);
   const [customMsg, setCustomMsg] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -198,6 +198,57 @@ export default function Emergency() {
           })}
         </div>
       </div>
+
+      {/* Contact Dispatch Status */}
+      {dispatchedContacts.length > 0 && (
+        <div className="bg-white rounded-3xl p-6 border border-stone-200/90 shadow-[4px_4px_0px_0px_rgba(28,25,23,0.06)]">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-stone-100">
+            <Phone className="w-5 h-5 text-red-600" />
+            <h3 className="font-bold text-lg text-stone-900 font-sans">Contact Dispatch Status</h3>
+            <span className="ml-auto text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              {dispatchedContacts.length} alerted
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {dispatchedContacts.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#f8f7f4] border border-stone-200/80">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-stone-900 leading-none">{c.name}</p>
+                    <p className="text-[11px] font-mono text-stone-500 mt-0.5">{c.phone}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <a
+                    href={c.waLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-colors"
+                    title="Open WhatsApp"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" /> WA
+                  </a>
+                  <a
+                    href={c.smsLink}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-colors"
+                    title="Open SMS"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> SMS
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-stone-500 font-mono mt-3 text-center">
+            WhatsApp windows auto-opened · Tap WA/SMS to retry if blocked
+          </p>
+        </div>
+      )}
 
       {/* Quick Predefined Communication */}
       <div className="bg-white rounded-3xl p-6 border border-stone-200/90 shadow-[4px_4px_0px_0px_rgba(28,25,23,0.06)]">

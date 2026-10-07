@@ -1,11 +1,26 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Home, Phone, MapPin, History, Settings, ShieldAlert } from 'lucide-react';
+import { Home, Phone, MapPin, History, Settings, ShieldAlert, User } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Layout() {
   const location = useLocation();
   const { highContrast } = useAccessibility();
-  
+  const { user } = useAuth();
+
+  // Derive display name: prefer full_name metadata, else email prefix, else 'User'
+  const fullName: string =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    'User';
+
+  // Initials for avatar fallback
+  const initials = fullName
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0]?.toUpperCase() ?? '')
+    .join('');
+
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Command' },
     { path: '/contacts', icon: Phone, label: 'Contacts' },
@@ -14,7 +29,9 @@ export default function Layout() {
     { path: '/history', icon: History, label: 'Logs' },
   ];
 
-  const headerBg = highContrast ? 'bg-stone-900 border-b border-stone-700' : 'bg-[#f8f7f4]/90 backdrop-blur-md border-b border-stone-200/80';
+  const headerBg = highContrast
+    ? 'bg-stone-900 border-b border-stone-700'
+    : 'bg-[#f8f7f4]/90 backdrop-blur-md border-b border-stone-200/80';
   const textColor = highContrast ? 'text-stone-300' : 'text-stone-600';
   const activeColor = highContrast ? 'text-red-400 font-bold' : 'text-red-600 font-bold';
 
@@ -40,13 +57,13 @@ export default function Layout() {
           </span>
         </div>
 
-        <nav className="flex items-center gap-7">
+        <nav className="flex items-center gap-6">
           {navItems.map((item) => {
             if (item.isPrimary) return null;
             const isActive = location.pathname === item.path;
             return (
-              <Link 
-                key={item.path} 
+              <Link
+                key={item.path}
                 to={item.path}
                 className={`text-sm font-medium flex items-center gap-2 transition-colors hover:text-red-600 ${isActive ? activeColor : textColor}`}
               >
@@ -55,23 +72,53 @@ export default function Layout() {
               </Link>
             );
           })}
-          
-          <Link 
-            to="/accessibility" 
+
+          <Link
+            to="/accessibility"
             className={`text-sm font-medium transition-colors hover:text-red-600 ${location.pathname === '/accessibility' ? activeColor : textColor}`}
           >
             Accessibility
           </Link>
 
-          <Link 
-            to="/settings" 
+          <Link
+            to="/settings"
             className={`p-2 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 transition-colors ${textColor}`}
             title="Settings"
           >
             <Settings className="w-4 h-4" />
           </Link>
+
+          {/* ── User Name Badge (right corner) ── */}
+          {user && (
+            <Link
+              to="/profile"
+              className="flex items-center gap-2.5 pl-3 border-l border-stone-200 hover:opacity-80 transition-opacity"
+              title="View Profile"
+            >
+              {/* Avatar circle with initials */}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center text-xs font-black shadow-sm shrink-0">
+                {initials || <User className="w-4 h-4" />}
+              </div>
+              {/* Name */}
+              <span className="text-sm font-semibold text-stone-800 max-w-[120px] truncate leading-none">
+                {fullName}
+              </span>
+            </Link>
+          )}
         </nav>
       </header>
+
+      {/* Mobile Top Bar — shows user name */}
+      {user && (
+        <div className="md:hidden fixed top-1.5 right-0 z-[55] flex items-center gap-2 px-3 py-1.5">
+          <Link to="/profile" className="flex items-center gap-1.5 bg-white/80 backdrop-blur-sm border border-stone-200 rounded-full px-2.5 py-1 shadow-sm">
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">
+              {initials || <User className="w-3 h-3" />}
+            </div>
+            <span className="text-[11px] font-bold text-stone-800 max-w-[80px] truncate">{fullName.split(' ')[0]}</span>
+          </Link>
+        </div>
+      )}
 
       {/* Main Content Container */}
       <main className="max-w-md md:max-w-4xl mx-auto p-4 md:p-6 min-h-[calc(100vh-4.5rem)]">
@@ -82,11 +129,11 @@ export default function Layout() {
       <nav className="md:hidden fixed bottom-0 w-full h-20 bg-[#f8f7f4]/95 backdrop-blur-md border-t border-stone-200/90 shadow-[0_-4px_20px_rgba(28,25,23,0.06)] z-50 flex justify-around items-center px-2 pb-safe">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
-          
+
           if (item.isPrimary) {
             return (
-              <Link 
-                key={item.path} 
+              <Link
+                key={item.path}
                 to={item.path}
                 className="relative -top-5 flex flex-col items-center"
               >
@@ -99,8 +146,8 @@ export default function Layout() {
           }
 
           return (
-            <Link 
-              key={item.path} 
+            <Link
+              key={item.path}
               to={item.path}
               className={`flex flex-col items-center p-2 min-w-[4rem] transition-colors ${isActive ? activeColor : textColor}`}
             >
