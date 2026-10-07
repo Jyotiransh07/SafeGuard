@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { RefreshCw, Share2, Radio, Navigation, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useEmergency } from '../context/EmergencyContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -186,19 +186,22 @@ export default function LocationPage() {
           </div>
         )}
 
-        {/* OpenStreetMap via react-leaflet — works on all domains, no API key */}
+        {/* Google Maps Hybrid Tiles via react-leaflet (No API key needed) */}
         {!loading && !geoError && position && (
           <MapContainer
             center={position}
             zoom={16}
             style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, height: '100%', width: '100%' }}
-            zoomControl={true}
+            zoomControl={false} // We add it manually below
             attributionControl={false}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+              attribution='&copy; Google Maps'
             />
+            {/* Move zoom control to bottom right so it doesn't overlap top-left coordinates */}
+            <ZoomControl position="bottomright" />
+            
             <MapRecenter lat={position[0]} lng={position[1]} />
             <Marker position={position} icon={sosIcon}>
               <Popup>
